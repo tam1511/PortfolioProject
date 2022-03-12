@@ -1,0 +1,259 @@
+---
+title: "CyclisticBikeShare_Project_02"
+author: "Le Thi Thanh Tam"
+date: "3/12/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# How do annual members and casual riders use Cyclistic bikes differently ?
+
+```{r message=FALSE, error= FALSE, results='hide'}
+#get the default working directory of R
+getwd()
+#set the desired working directory of R
+setwd('E:/ThanhTam_DA/Cyclistic_Data')
+#remove all the objects 
+rm(list = ls())
+#clear the console
+cat("\014")
+#clear the plots
+dev.off()
+```
+
+
+```{r message = FALSE }
+# Install required packages
+# tidyverse for data import and wrangling
+# libridate for date functions
+# ggplot for visualization
+library(tidyverse)  #helps wrangle data
+library(lubridate)  #helps wrangle date attributes
+library(ggplot2)  #helps visualize data
+```
+## Import the datasets
+
+```{r}
+## The Cyclistic’s historical trip data is collected by every months, we will work on dataset from 2021/04 to 2022/02
+# Import data 
+tripdata042021 <- read.csv("202104-divvy-tripdata.csv")
+tripdata052021 <- read.csv("202105-divvy-tripdata.csv")
+tripdata062021 <- read.csv("202106-divvy-tripdata.csv")
+tripdata072021 <- read.csv("202107-divvy-tripdata.csv")
+tripdata082021 <- read.csv("202108-divvy-tripdata.csv")
+tripdata092021 <- read.csv("202109-divvy-tripdata.csv")
+tripdata102021 <- read.csv("202110-divvy-tripdata.csv")
+tripdata112021 <- read.csv("202111-divvy-tripdata.csv")
+tripdata122021 <- read.csv("202112-divvy-tripdata.csv")
+tripdata012022 <- read.csv("202201-divvy-tripdata.csv")
+tripdata022022 <- read.csv("202202-divvy-tripdata.csv")
+```
+
+```{r}
+# See the column names of each file to make sure they will be match perfectly before joinning data
+colnames(tripdata012022)
+colnames(tripdata022022)
+colnames(tripdata042021)
+colnames(tripdata052021)
+colnames(tripdata062021)
+colnames(tripdata072021)
+colnames(tripdata082021)
+colnames(tripdata092021)
+colnames(tripdata102021)
+colnames(tripdata112021)
+colnames(tripdata122021)
+# Internal structurer
+str(tripdata012022)
+str(tripdata022022)
+str(tripdata042021)
+str(tripdata052021)
+str(tripdata062021)
+str(tripdata072021)
+str(tripdata082021)
+str(tripdata092021)
+str(tripdata102021)
+str(tripdata112021)
+str(tripdata122021)
+```
+
+```{r}
+#Combine all data into a single dataset
+all_trips <- rbind(tripdata042021,tripdata052021,tripdata062021,tripdata072021,tripdata082021,
+                   tripdata092021,tripdata102021,tripdata112021,tripdata122021,tripdata012022,
+                   tripdata022022)
+```
+
+```{r}
+# Inspect the new table
+colnames(all_trips)
+str(all_trips)
+dim(all_trips)
+head(all_trips)
+summary(all_trips)
+```
+
+## Clean and Transform the data
+```{r}
+#We will work on the member_casual column. Let's take a look at the consistency of values in this
+unique(all_trips$member_casual)
+```
+
+```{r}
+# Format check 
+head(all_trips[,c("started_at", "ended_at")])
+## Convert to date type
+## Add column date, month, year and weekday to dataset for further analyze
+all_trips$date <- as.Date(all_trips$started_at)
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+all_trips$day <- format(as.Date(all_trips$date), "%d")
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+head(all_trips)
+```
+
+```{r}
+# Add a new column "ride_length" to calculate in second
+all_trips$ride_length <- difftime(all_trips$ended_at, all_trips$started_at)
+```
+
+
+```{r}
+# Inspect the structure of dataset
+str(all_trips)
+is.factor(all_trips$ride_length)
+is.numeric(all_trips$ride_length)
+# Convert "ride_length" to numeric so we can run calculations
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+is.numeric(all_trips$ride_length)
+min(all_trips$ride_length)
+# There has negative datas in ride_length
+# Create a new data with deleted negatives values in ride_length
+all_trips_v2 <- all_trips[!(all_trips$ride_length < 0),]
+min(all_strips_v2$ride_length)
+```
+
+## Descriptive Analysis
+*The number of each ride type user
+```{r}
+table(all_trips_v2$member_casual)
+```
+In total of 5,439,347 users id, there has 2,456,602 casual users and 2,982,745 member users
+
+*Ride length data
+
+```{r}
+summary(all_trips_v2$ride_length)
+```
+As we can see above the description of ride length data 75% riders ride for 1291 seconds but the maximum ride length is 3356649 seconds.
+
+### Compare members and casual users according to ride length 
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = max)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)
+```
+
+
+The average in ride length of casual riders is 1902s higher than member riders (807.7s)
+The median ride length of casual riders is 949s, and member riders is 568s
+The maximum ride time of casual riders (3356649s) is much higher than member riders (89998s)
+
+
+### Next see the average ride time by each day for members and casual users
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+```
+
+```{r}
+# The day of week are out of order
+all_trips_v2$day_of_week <- ordered(all_trips_v2$day_of_week, levels = c("Sunday","Monday", "Tuesday","Wednesday", "Thursday", "Friday", "Saturday"))
+# Now run again
+memory.size()
+memory.limit()
+memory.limit(size=56000)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+```
+
+### Analyze ridership data by type and weekday
+```{r}
+# See the number of rides and average duration by type during weekday
+all_trips_v2 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_riders = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday)
+  
+```
+
+### Create Visualization for number of riders by type
+* Number of riders on weekday
+```{r fig.height=3}
+# Create a graph to visualize the number of riders by ride type during weekday
+all_trips_v2 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual,weekday) %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) + geom_col(position = "dodge")
+```
+From the chart above we can see the clearly difference only for casual users ride highly on Saturday and then Sunday Whereas member of users use bike at the almost constant rate during the week.
+
+* Number of riders per day
+```{r fig.width= 4, fig.width=7}
+all_trips_v2 %>% 
+  group_by(member_casual, day) %>% 
+  summarize(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual,day) %>% 
+  ggplot(aes(x = day, y = number_of_rides,group = member_casual, color = member_casual)) + geom_line()
+```
+We can certainly say members use bikes more often than casual in general. 
+
+* Number of riders per month
+```{r fig.width= 4, fig.width=5}
+all_trips_v2 %>% 
+  group_by(member_casual, month) %>% 
+  summarize(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual,month) %>% 
+  ggplot(aes(x = month, y = number_of_rides,group = member_casual, color = member_casual)) + geom_line()
+```
+From line plot above we can see members use bikes more often than casual however casual users have dramatic rise from June 2021 to August 2021. 
+
+### Create Visualization for rider length
+*Usage of ride type based on ride length per week
+```{r fig.height= 3}
+# Create a graph to visualize the average duration by type during weekday
+all_trips_v2 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual,weekday) %>% 
+  ggplot(aes(x = weekday, y = average_duration, fill = member_casual)) + geom_col(position = "dodge")
+```
+The above graph shows the clearly understanding about the average ride length. Casual type users ride much longer and as expected weekend got the higher ride length than others.
+
+*Usage of ride type based on ride length per day
+```{r fig.width= 4, fig.width=5}
+all_trips_v2 %>% 
+  group_by(member_casual, day) %>% 
+  summarize(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual,day) %>% 
+  ggplot(aes(x = day, y = average_duration,group = member_casual, color = member_casual)) + geom_line()
+```
+The graph above shows the big gap between casual and member type. casual users spent much more time per day in using bikes more than members.
+
+*Usage of ride type based on ride length per month
+```{r fig.width= 4, fig.width=5}
+all_trips_v2 %>% 
+  group_by(member_casual, month) %>% 
+  summarize(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual,month) %>% 
+  ggplot(aes(x = month, y = average_duration,group = member_casual, color = member_casual)) + geom_line()
+```
+Also we can see the result from table above, casual users spend much more time than member users per month using bike.
+
+
+
