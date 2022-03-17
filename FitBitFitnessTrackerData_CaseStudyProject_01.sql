@@ -155,12 +155,14 @@ LEFT JOIN PortfolioProject..sleepDay sl
 SELECT TotalSteps, Calories
 FROM PortfolioProject..dailyActivity
 ORDER BY 1
+----- As expected, there has correlation between total steps and calories. The more steps taken the more calories be burnt
 
----Table 2 Relationship between total steps and sendentary
+---Table 2 Total steps and sedentary
 SELECT Id,AVG(TotalSteps) as averageStepperid, AVG(SedentaryMinutes) as averagetimeSedentary
 FROM PortfolioProject..dailyActivity
 GROUP BY Id
 ORDER BY 2
+----- Table 2 show the number of time user spend in sitting or sedentary and total steps. there has no clearly correlations between them in this case
 --- Table 3 Relationship between total steps per day and sleeping time per day
 SELECT ac.Id,ac.TotalSteps,sl.TotalMinutesAsleep
 FROM PortfolioProject..dailyActivity ac
@@ -169,6 +171,7 @@ LEFT JOIN PortfolioProject..sleepDay sl
 	AND sl.Sleep_Date = ac.Activity_Date
 WHERE TotalMinutesAsleep is not null
 ORDER BY 1
+------- In general, users who steps more during a day tend to spend more time in sleeping.
 
 ---Table 4 Active steps in a day during week
 
@@ -190,5 +193,5 @@ DROP COLUMN Date_time
 SELECT Id,StepTotal,DATENAME(WEEKDAY,Step_date) as Step_weekday,Step_time
 FROM PortfolioProject..hourlySteps
 
-
+---- Table 4 shows people started their day later on weekend and are most active 11am to 1pm on Saturday and 5pm-6pm on Wednesday
 
