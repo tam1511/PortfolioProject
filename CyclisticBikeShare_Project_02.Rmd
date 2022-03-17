@@ -255,5 +255,10 @@ all_trips_v2 %>%
 ```
 Also we can see the result from table above, casual users spend much more time than member users per month using bike.
 
+# My recommendations
 
+*From the above results, we can see casual riders ride the most during weekends and from June to August (could be Summer time, people tend to use bikes more often). So different price strategy should be considered. That would be equivalent to the savings for those who make a change to annual membership.
 
+*Also we can see the ride length of casual riders is higher than annual members in general. So it should be increase cost ride time for casual type.
+
+*Our purpose to maximize the number of annual memberships, therefore take care of existing annual members is also crucial. For example, can conduct discount offers for monthly payment to an annual riders who introducing their friends or for existing casual riders who register as a member.
