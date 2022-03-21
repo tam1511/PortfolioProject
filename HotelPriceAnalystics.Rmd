@@ -1,0 +1,243 @@
+---
+title: "HotelPriceAnalystics"
+author: "Le Thi Thanh Tam"
+date: "3/21/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Web Scraping Project: Hotel Pricing Analytics
+
+1. Scrape Information from website
+
+Booking.com is a website that allows travellers to book hotels in various cities worldwide. In this project, we would like to collect information about hotels in Korea like their names, type of room, location, etc,.. by scraping data from this website. From that we can learns some features and can train a model to predict which factors affect to price
+
+```{r echo = TRUE, error=FALSE, warning=FALSE, message=FALSE, results='hide'}
+# Install the packages
+#install.packages('robotstxt')
+#install.packages('XML')
+#install.packages('plotly')
+library(robotstxt)
+library(rvest)
+library(XML)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(stringr)
+library(purrr)
+```
+
+Before look into the website checking for scraping permission first
+
+```{r}
+# Check for scraping permission
+paths_allowed("https://www.booking.com/searchresults.en-gb.html?label=gen173nr-1FCAEoggI46AdIM1gEaH2IAQGYAQm4ARfIAQzYAQHoAQH4AQuIAgGoAgO4AseA25EGwAIB0gIkMzg4NDljNzEtNmNlZC00MzZiLTg4MWQtMmRkOTVkN2JhMDI32AIG4AIB&sid=8bcb5a362ae6b89de9033d81999e1815&aid=304142&sb=1&sb_lp=1&src=index&src_elem=sb&error_url=https%3A%2F%2Fwww.booking.com%2Findex.en-gb.html%3Flabel%3Dgen173nr-1FCAEoggI46AdIM1gEaH2IAQGYAQm4ARfIAQzYAQHoAQH4AQuIAgGoAgO4AseA25EGwAIB0gIkMzg4NDljNzEtNmNlZC00MzZiLTg4MWQtMmRkOTVkN2JhMDI32AIG4AIB%3Bsid%3D8bcb5a362ae6b89de9033d81999e1815%3Bsb_price_type%3Dtotal%26%3B&ss=Seoul&is_ski_area=0&ssne=Seoul&ssne_untouched=Seoul&dest_id=-716583&dest_type=city&checkin_year=2022&checkin_month=4&checkin_monthday=21&checkout_year=2022&checkout_month=4&checkout_monthday=30&group_adults=2&group_children=0&no_rooms=1&b_h4u_keep_filters=&from_sf=1&offset=")
+
+```
+
+Now we start creating dataset including hotel name, type of room, price, rating, bed, location from the hotel to city center.
+We are going to scrape information from multipage results of searching hotels in Seoul, Busan, Jeju, Incheon, Daegu from April 21th to April 30th
+
+```{r echo=TRUE, results='hide'}
+#1. Data in Seoul
+data_seoul = data.frame()
+for (page_result in seq(from =0,to=500,by =25)) {
+  seoul_link <- paste("https://www.booking.com/searchresults.en-gb.html?label=gen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB&sid=8bcb5a362ae6b89de9033d81999e1815&aid=304142&src=index&rows=20&error_url=https%3A%2F%2Fwww.booking.com%2Findex.en-gb.html%3Flabel%3Dgen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB%3Bsid%3D8bcb5a362ae6b89de9033d81999e1815%3Bsb_price_type%3Dtotal%26%3B&sb=1&sb_lp=1&search_form_id=94f62ce50aa1010a&dest_type=city&dest_id=-716583&ssne=Seoul&ssne_untouched=Seoul&ss=Seoul&checkin_monthday=21&checkin_year_month=2022-4&checkout_monthday=30&checkout_year_month=2022-4&checkin=2022-04-21&checkout=2022-04-30&group_adults=2&group_children=0&no_rooms=1&group_adults_overlay=2&group_children_overlay=0&no_rooms_overlay=1&lpsr=1&search_pageview_id=94f62ce50aa1010a&offset=",page_result,sep="")
+  page_seoul <- read_html(seoul_link)
+  name <- page_seoul %>% html_nodes("._c445487e2") %>% html_text()
+  price <- page_seoul %>% html_nodes("._5aba9d433 ._e885fdc12") %>% html_text()
+  room_type <- page_seoul %>% html_nodes("._7192d3184") %>% html_node("._c5d12bf22") %>%  html_text()
+  rating <- page_seoul %>%html_nodes("._7192d3184") %>%  html_node(".bd528f9ea6") %>% html_text() 
+  bed <- page_seoul %>%  html_nodes(".b4a7e56ea7") %>% html_node("._7e8121222 ._2075f7b46") %>% html_text()
+  location <- page_seoul %>% html_nodes("._7192d3184") %>% html_node("._cff98816f") %>% html_text()
+  location <- as.numeric(unlist(regmatches(location,gregexpr("[[:digit:]]+\\.*[[:digit:]]*",location))))
+  data_seoul <- rbind(data_seoul,data.frame(name,price,room_type,rating, bed, location)) 
+  print(paste("page:", page_result))
+}
+data_seoul$city <- rep("Seoul")
+
+#2. Hotels dataset in Busan
+data_busan = data.frame()
+for (page_result in seq(from =0,to=500,by =25)) {
+  busan_link <- paste("https://www.booking.com/searchresults.en-gb.html?label=gen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB&sid=8bcb5a362ae6b89de9033d81999e1815&aid=304142&sb=1&src=searchresults&src_elem=sb&error_url=https%3A%2F%2Fwww.booking.com%2Fsearchresults.en-gb.html%3Faid%3D304142%3Blabel%3Dgen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB%3Bsid%3D8bcb5a362ae6b89de9033d81999e1815%3Btmpl%3Dsearchresults%3Bcheckin_month%3D4%3Bcheckin_monthday%3D21%3Bcheckin_year%3D2022%3Bcheckout_month%3D4%3Bcheckout_monthday%3D30%3Bcheckout_year%3D2022%3Bcity%3D-716583%3Bclass_interval%3D1%3Bdest_id%3D-716583%3Bdest_type%3Dcity%3Bdtdisc%3D0%3Bfrom_sf%3D1%3Bgroup_adults%3D2%3Bgroup_children%3D0%3Binac%3D0%3Bindex_postcard%3D0%3Blabel_click%3Dundef%3Bno_rooms%3D1%3Boffset%3D0%3Bpostcard%3D0%3Broom1%3DA%252CA%3Bsb_price_type%3Dtotal%3Bshw_aparth%3D1%3Bslp_r_match%3D0%3Bsrc%3Dsearchresults%3Bsrc_elem%3Dsb%3Bsrpvid%3D17e26c06f6540021%3Bss%3DSeoul%3Bss_all%3D0%3Bssb%3Dempty%3Bsshis%3D0%3Bssne%3DSeoul%3Bssne_untouched%3DSeoul%26%3B&ss=Busan%2C+South+Korea&is_ski_area=&ssne=Seoul&ssne_untouched=Seoul&city=-716583&checkin_year=2022&checkin_month=4&checkin_monthday=21&checkout_year=2022&checkout_month=4&checkout_monthday=30&group_adults=2&group_children=0&no_rooms=1&from_sf=1&sr_change_search=1&search_pageview_id=17e26c06f6540021&ac_suggestion_list_length=5&ac_suggestion_theme_list_length=0&ac_position=1&ac_langcode=en&ac_click_type=b&dest_id=-713900&dest_type=city&iata=PUS&place_id_lat=35.161423&place_id_lon=129.06236&search_pageview_id=17e26c06f6540021&search_selected=true&ss_raw=B&offset=",page_result,sep="")
+  page_busan <- read_html(busan_link)
+  name <- page_busan %>% html_nodes("._c445487e2") %>% html_text()
+  price <- page_busan %>% html_nodes("._5aba9d433 ._e885fdc12") %>% html_text()
+  room_type <- page_busan %>% html_nodes("._7192d3184") %>% html_node("._c5d12bf22") %>%  html_text()
+  rating <- page_busan %>%html_nodes("._7192d3184") %>%  html_node(".bd528f9ea6") %>% html_text() 
+  bed <- page_busan %>%  html_nodes(".b4a7e56ea7") %>% html_node("._7e8121222 ._2075f7b46") %>% html_text()
+  location <- page_busan %>% html_nodes("._7192d3184") %>% html_node("._cff98816f") %>% html_text()
+  location <- as.numeric(unlist(regmatches(location,gregexpr("[[:digit:]]+\\.*[[:digit:]]*",location))))
+  
+  data_busan <- rbind(data_busan,data.frame(name,price,room_type,rating, bed, location)) 
+  print(paste("page:", page_result))
+}
+data_busan$city = rep("Busan")
+#3. Hotel dataset in Jeju
+data_jeju = data.frame()
+for (page_result in seq(from =0,to=500,by =25)) {
+  jeju_link <- paste("https://www.booking.com/searchresults.en-gb.html?label=gen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB&sid=8bcb5a362ae6b89de9033d81999e1815&aid=304142&sb=1&src=searchresults&src_elem=sb&error_url=https%3A%2F%2Fwww.booking.com%2Fsearchresults.en-gb.html%3Faid%3D304142%3Blabel%3Dgen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB%3Bsid%3D8bcb5a362ae6b89de9033d81999e1815%3Btmpl%3Dsearchresults%3Bac_click_type%3Db%3Bac_position%3D0%3Bcheckin_month%3D4%3Bcheckin_monthday%3D21%3Bcheckin_year%3D2022%3Bcheckout_month%3D4%3Bcheckout_monthday%3D30%3Bcheckout_year%3D2022%3Bcity%3D-717105%3Bclass_interval%3D1%3Bdest_id%3D4170%3Bdest_type%3Dregion%3Bdtdisc%3D0%3Bfrom_sf%3D1%3Bgroup_adults%3D2%3Bgroup_children%3D0%3Binac%3D0%3Bindex_postcard%3D0%3Blabel_click%3Dundef%3Bno_rooms%3D1%3Boffset%3D0%3Bpostcard%3D0%3Braw_dest_type%3Dregion%3Broom1%3DA%252CA%3Bsb_price_type%3Dtotal%3Bsearch_selected%3D1%3Bshw_aparth%3D1%3Bslp_r_match%3D0%3Bsrc%3Dsearchresults%3Bsrc_elem%3Dsb%3Bsrpvid%3D4fac70589d6c0185%3Bss%3DJeju%2520Island%252C%2520South%2520Korea%3Bss_all%3D0%3Bss_raw%3Djeju%3Bssb%3Dempty%3Bsshis%3D0%3Bssne%3DDaegu%3Bssne_untouched%3DDaegu%26%3B&ss=Jeju%2C+Jeju+Island%2C+South+Korea&is_ski_area=&ssne=Jeju+Island&ssne_untouched=Jeju+Island&checkin_year=2022&checkin_month=4&checkin_monthday=21&checkout_year=2022&checkout_month=4&checkout_monthday=30&group_adults=2&group_children=0&no_rooms=1&from_sf=1&sr_change_search=1&search_pageview_id=4fac70589d6c0185&ac_suggestion_list_length=5&ac_suggestion_theme_list_length=0&ac_position=2&ac_langcode=en&ac_click_type=b&dest_id=-714191&dest_type=city&iata=CJU&place_id_lat=33.506&place_id_lon=126.531&search_pageview_id=4fac70589d6c0185&search_selected=true&ss_raw=jeju&offset=",page_result,sep="")
+  page_jeju <- read_html(jeju_link)
+  name <- page_jeju %>% html_nodes("._c445487e2") %>% html_text()
+  price <- page_jeju %>% html_nodes("._5aba9d433 ._e885fdc12") %>% html_text()
+  room_type <- page_jeju %>% html_nodes("._7192d3184") %>% html_node("._c5d12bf22") %>%  html_text()
+  rating <- page_jeju %>%html_nodes("._7192d3184") %>%  html_node(".bd528f9ea6") %>% html_text() 
+  bed <- page_jeju %>%  html_nodes(".b4a7e56ea7") %>% html_node("._7e8121222 ._2075f7b46") %>% html_text()
+  location <- page_jeju %>% html_nodes("._7192d3184") %>% html_node("._cff98816f") %>% html_text()
+  location <- as.numeric(unlist(regmatches(location,gregexpr("[[:digit:]]+\\.*[[:digit:]]*",location))))
+  data_jeju <- rbind(data_jeju,data.frame(name,price,room_type,rating, bed, location)) 
+  print(paste("page:", page_result))
+}
+data_jeju$city <- rep("Jeju")
+
+#4. Hotel data in Incheon
+data_incheon = data.frame()
+for (page_result in seq(from =0,to=500,by =25)) {
+  incheon_link <- paste("https://www.booking.com/searchresults.en-gb.html?label=gen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB&sid=8bcb5a362ae6b89de9033d81999e1815&aid=304142&sb=1&src=searchresults&src_elem=sb&error_url=https%3A%2F%2Fwww.booking.com%2Fsearchresults.en-gb.html%3Faid%3D304142%3Blabel%3Dgen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB%3Bsid%3D8bcb5a362ae6b89de9033d81999e1815%3Btmpl%3Dsearchresults%3Bac_click_type%3Db%3Bac_position%3D0%3Bcheckin_month%3D4%3Bcheckin_monthday%3D21%3Bcheckin_year%3D2022%3Bcheckout_month%3D4%3Bcheckout_monthday%3D30%3Bcheckout_year%3D2022%3Bcity%3D-713900%3Bclass_interval%3D1%3Bdest_id%3D4170%3Bdest_type%3Dregion%3Bdtdisc%3D0%3Bfrom_sf%3D1%3Bgroup_adults%3D2%3Bgroup_children%3D0%3Binac%3D0%3Bindex_postcard%3D0%3Blabel_click%3Dundef%3Bno_rooms%3D1%3Boffset%3D0%3Bpostcard%3D0%3Braw_dest_type%3Dregion%3Broom1%3DA%252CA%3Bsb_price_type%3Dtotal%3Bsearch_selected%3D1%3Bshw_aparth%3D1%3Bslp_r_match%3D0%3Bsrc%3Dsearchresults%3Bsrc_elem%3Dsb%3Bsrpvid%3D50ed6d2eeeee07a4%3Bss%3DJeju%2520Island%252C%2520South%2520Korea%3Bss_all%3D0%3Bss_raw%3Dje%3Bssb%3Dempty%3Bsshis%3D0%3Bssne%3DBusan%3Bssne_untouched%3DBusan%26%3B&ss=Incheon%2C+South+Korea&is_ski_area=&ssne=Jeju+Island&ssne_untouched=Jeju+Island&checkin_year=2022&checkin_month=4&checkin_monthday=21&checkout_year=2022&checkout_month=4&checkout_monthday=30&group_adults=2&group_children=0&no_rooms=1&from_sf=1&sr_change_search=1&search_pageview_id=50ed6d2eeeee07a4&ac_suggestion_list_length=5&ac_suggestion_theme_list_length=0&ac_position=0&ac_langcode=en&ac_click_type=b&dest_id=-708814&dest_type=city&place_id_lat=37.45618&place_id_lon=126.7053&search_pageview_id=50ed6d2eeeee07a4&search_selected=true&ss_raw=in&offset=",page_result,sep="")
+  page_incheon <- read_html(incheon_link)
+  name <- page_incheon %>% html_nodes("._c445487e2") %>% html_text()
+  price <- page_incheon %>% html_nodes("._5aba9d433 ._e885fdc12") %>% html_text()
+  room_type <- page_incheon %>% html_nodes("._7192d3184") %>% html_node("._c5d12bf22") %>%  html_text()
+  rating <- page_incheon %>%html_nodes("._7192d3184") %>%  html_node(".bd528f9ea6") %>% html_text() 
+  bed <- page_incheon %>%  html_nodes(".b4a7e56ea7") %>% html_node("._7e8121222 ._2075f7b46") %>% html_text()
+  location <- page_incheon %>% html_nodes("._7192d3184") %>% html_node("._cff98816f") %>% html_text()
+  location <- as.numeric(unlist(regmatches(location,gregexpr("[[:digit:]]+\\.*[[:digit:]]*",location))))
+  data_incheon <- rbind(data_incheon,data.frame(name,price,room_type,rating, bed, location)) 
+  print(paste("page:", page_result))
+}
+data_incheon$city <- rep("Incheon")
+#5. Hotel data in Daegu
+data_daegu = data.frame()
+for (page_result in seq(from =0,to=500,by =25)) {
+  daegu_link <- paste("https://www.booking.com/searchresults.en-gb.html?label=gen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB&sid=8bcb5a362ae6b89de9033d81999e1815&aid=304142&sb=1&src=searchresults&src_elem=sb&error_url=https%3A%2F%2Fwww.booking.com%2Fsearchresults.en-gb.html%3Faid%3D304142%3Blabel%3Dgen173nr-1FCAEoggI46AdIM1gEaH2IAQKYAQm4AQnIARHYAQHoAQH4AQuIAgGoAgO4AsuQ25EGwAIB0gIkNDNlZjFkMWYtNWViMi00NmYyLTkwY2YtMDM3ZTNkMTQzZWJi2AIG4AIB%3Bsid%3D8bcb5a362ae6b89de9033d81999e1815%3Btmpl%3Dsearchresults%3Bac_click_type%3Db%3Bac_position%3D0%3Bcheckin_month%3D4%3Bcheckin_monthday%3D21%3Bcheckin_year%3D2022%3Bcheckout_month%3D4%3Bcheckout_monthday%3D30%3Bcheckout_year%3D2022%3Bclass_interval%3D1%3Bdest_id%3D-708814%3Bdest_type%3Dcity%3Bdtdisc%3D0%3Bfrom_sf%3D1%3Bgroup_adults%3D2%3Bgroup_children%3D0%3Binac%3D0%3Bindex_postcard%3D0%3Blabel_click%3Dundef%3Bno_rooms%3D1%3Boffset%3D0%3Bpostcard%3D0%3Braw_dest_type%3Dcity%3Broom1%3DA%252CA%3Bsb_price_type%3Dtotal%3Bsearch_selected%3D1%3Bshw_aparth%3D1%3Bslp_r_match%3D0%3Bsrc%3Dsearchresults%3Bsrc_elem%3Dsb%3Bsrpvid%3Da11c6ee0e2e500f8%3Bss%3DIncheon%252C%2520South%2520Korea%3Bss_all%3D0%3Bss_raw%3Din%3Bssb%3Dempty%3Bsshis%3D0%3Bssne%3DJeju%2520Island%3Bssne_untouched%3DJeju%2520Island%26%3B&ss=Daegu%2C+South+Korea&is_ski_area=&ssne=Incheon&ssne_untouched=Incheon&city=-708814&checkin_year=2022&checkin_month=4&checkin_monthday=21&checkout_year=2022&checkout_month=4&checkout_monthday=30&group_adults=2&group_children=0&no_rooms=1&from_sf=1&sr_change_search=1&search_pageview_id=a11c6ee0e2e500f8&ac_suggestion_list_length=5&ac_suggestion_theme_list_length=0&ac_position=0&ac_langcode=en&ac_click_type=b&dest_id=-717105&dest_type=city&iata=TAE&place_id_lat=35.84041&place_id_lon=128.55865&search_pageview_id=a11c6ee0e2e500f8&search_selected=true&ss_raw=dae&offset=",page_result,sep="")
+  page_daegu <- read_html(daegu_link)
+  name <- page_daegu %>% html_nodes("._c445487e2") %>% html_text()
+  price <- page_daegu %>% html_nodes("._5aba9d433 ._e885fdc12") %>% html_text()
+  room_type <- page_daegu %>% html_nodes("._7192d3184") %>% html_node("._c5d12bf22") %>%  html_text()
+  rating <- page_daegu %>%html_nodes("._7192d3184") %>%  html_node(".bd528f9ea6") %>% html_text() 
+  bed <- page_daegu %>%  html_nodes(".b4a7e56ea7") %>% html_node("._7e8121222 ._2075f7b46") %>% html_text()
+  location <- page_daegu %>% html_nodes("._7192d3184") %>% html_node("._cff98816f") %>% html_text()
+  location <- as.numeric(unlist(regmatches(location,gregexpr("[[:digit:]]+\\.*[[:digit:]]*",location))))
+  data_daegu <- rbind(data_daegu,data.frame(name,price,room_type,rating, bed, location))
+  print(paste("page:", page_result))
+}
+data_daegu$city <- rep("Daegu")
+```
+
+Finally conduct a dataframe for all information
+
+```{r}
+### Combine to a dataframe and inspect its structure
+hotel_data <- rbind(data_seoul, data_busan, data_jeju, data_incheon, data_daegu)
+# Structure of dataframe
+#str(data)
+#setwd('E:/ThanhTam_DA')
+#save(data, file = "E:/ThanhTam_DA/Hotel.Rdata")
+#write.csv(data, "Hoteldata.csv")
+### Store in JSON format for further process
+#library(jsonlite)
+#json_data <- toJSON(data)
+# print output
+#cat(json_data)
+```
+
+2. Data visualization
+
+We want to see some trends based on the data we collected. 
+
+###1. The price range in each city
+
+```{r fig.width= 4, fig.width=7}
+## Extract currency amounts from a string 
+#install.packages("filesstrings")
+library(filesstrings)
+currency <- str_extract_currencies(hotel_data$price)
+hotel_data$price_new <- currency[,"amount"]
+## Create a summary chart for hotel price based on city
+summary_chart <- hotel_data %>% group_by(city) %>% 
+  summarise(price = price_new,.groups = "drop") %>% 
+  ggplot(aes(x = city, y = price, fill = city))+geom_boxplot()+
+  xlab("City") + ylab("Price (KRW") + ggtitle("Hotel Price Vs City")+
+  theme(plot.title = element_text(hjust = 0.5))+ theme(legend.position = "none")
+
+ggplotly(summary_chart)
+```
+
+
+From the graph above, we see some interesting information
+
+* The lowest hotel price in each city following: Seoul (117,990 KRW), Busan (221,637 KRW), Jeju (231,840 KRW), Daegu (240,000 KRW), Incheon (266,000 KRW).
+
+* In general, the average hotel price in each city are Jeju (554,175 KRW), Busan (572,000 KRW), Incheon (643,250 KRW), Daegu (660,000 KRW) and Seoul (707,750 KRW).
+
+* City has the highest hotel price is Incheon (9,899,010 KRW), following are Seoul (5,574,240 KRW), Jeju (5,206,500 KRW), Busan (3,470,000 KRW) and Daegu (2,321,000 KRW).
+
+##2.What is average price for each room type in each city ?
+
+```{r}
+summary_chart2 <- hotel_data %>% group_by(city,room_type) %>% 
+  summarise(Average_price = mean(price_new),.groups = "drop") %>% 
+  ggplot(aes(x = city, y = Average_price, fill = room_type))+geom_bar(stat="identity", position="dodge")+
+  xlab("City") + ylab("Average Price (KRW") + ggtitle("Average Price of Type Room in Cities")+
+  theme(legend.text = element_text(size = 3), legend.margin = margin(1,1,1,1)) + guides(fill = guide_legend(title = NULL))+
+  theme(plot.title = element_text(hjust = 0.5))
+ggplotly(summary_chart2)
+```
+
+* As we can see, In Busan "Royal Suite with Ocean View" has the highest average price, and "Twin Roomm with Bathroom" is the type of room has lowest price
+* In Daegu, "Three bedroom Apartment" is a highest room price and "Bed in 8-bed Mixed Dormitory Room" is the cheapest room 
+* "Four Bedroom Suite" in Incheon is the most expensive room type and "Single Bed in Dormitory Room" is the type room has lowest price (around 270,000 KRW)
+* "Royal Suite included 2 breakfast" type is highest and "Basic Double Room" type is the lowest price in Jeju
+* In Seoul, approximately various room type price with "Two Bedrooms Apartment" is the highest price room and "Single Room with Share Shower and Toilet" is the cheapest room (only around 144,000 KRW in average).
+
+3. Data Analysis: On what factors Price basically depends on
+
+### Data Cleaning Process
+```{r warning= FALSE}
+## Data cleaning Process
+## Check for missing values and look how many unique values there are for each variable
+sapply(hotel_data,function(x) sum(is.na(x)))
+## A visual take on the missing values might be helpful
+#install.packages("Amelia")
+library(Amelia)
+missmap(hotel_data, main = "Missing values observe" )
+#### The variable "rating" has many missing values
+## We will drop "name" since it is only an index, hotel name
+data_hotel <- subset(hotel_data, select = c("city","price_new","bed","rating","location","room_type"))
+## Take care of the missing values by replace the missing values with the average of the existing one
+data_hotel$rating[is.na(data_hotel$rating)] <- mean(as.numeric(data_hotel$rating), na.rm = T)
+## "bed" has only 1 missing values, we will discard it
+data_hotel <- data_hotel[!is.na(data_hotel$bed),]
+rownames(data_hotel) <- NULL
+# Define values for bed column by extract numbers of bed
+data_hotel$bed <- as.numeric(gsub("([0-9]+).*$", "\\1", data_hotel$bed))
+
+# Define values for room_type to 5 different types (double room, twin room, dormitory, apartment and other)
+data_hotel$room_type[data_hotel$room_type != sub(".*Double Room.*","",data_hotel$room_type)] = "Double Room"
+data_hotel$room_type[data_hotel$room_type != sub(".*Standard Double Room.*","",data_hotel$room_type)] = "Double Room"
+data_hotel$room_type[data_hotel$room_type != sub(".*Twin Room.*","",data_hotel$room_type)] = "Twin Room"
+data_hotel$room_type[data_hotel$room_type != sub(".*Standard Twin Room.*","",data_hotel$room_type)] = "Twin Room"
+data_hotel$room_type[data_hotel$room_type != sub(".*Dormitory.*","",data_hotel$room_type)] = "Dormitory"
+data_hotel$room_type[data_hotel$room_type != sub(".*Apartment","",data_hotel$room_type)] = "Apartment"
+data_hotel$room_type[!(data_hotel$room_type) %in% c("Double Room" , "Twin Room" , "Dormitory" , "Apartment")] = "Other"
+
+## categorical variables are concerned
+data_hotel$city <- as.factor(data_hotel$city) # TRUE
+data_hotel$room_type <- as.factor(data_hotel$room_type) # TRUE
+data_hotel$rating <- as.numeric(data_hotel$rating)
+data_hotel$price <- as.numeric(data_hotel$price_new)
+data_hotel$price_new <- NULL
+```
+
+### Model fitting
+```{r}
+## Now lets train the model
+model <- lm(price~., data_hotel) 
+summary(model)
+
+```
+
+We can not conclude based on the result. Only around 10% (R-squared) of price being explained by model. Need to collect more data for further analysis.  
